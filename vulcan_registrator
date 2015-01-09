@@ -196,7 +196,7 @@ module Vulcand
     end
 
     def vulcan_services container_id
-      verbose "searching for vulcan services in container: #{container_name(container_id)}}"
+      verbose "searching for vulcan services in container: #{container_name(container_id)}"
 
       # step: we inspect the container and get the environment
       container = ::Docker::Container.get(container_id)
@@ -209,13 +209,13 @@ module Vulcand
       # step: validate we have an ipaddress for this container
       service_address = info["NetworkSettings"]["IPAddress"] || nil
       unless service_address
-        verbose "the container: #{container_name(container_id)}} has not ip address, skipping"
+        verbose "the container: #{container_name(container_id)} has not ip address, skipping"
         return
       end
 
       # step: if we have no exposed port we can ignore
       if exposed_ports.empty?
-        verbose "container: #{container_name(container_id)}} has not exposed services"
+        verbose "container: #{container_name(container_id)} has not exposed services"
         return
       end
 
