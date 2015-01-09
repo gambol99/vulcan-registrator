@@ -21,7 +21,7 @@ Usage
     # create the docker image
     [jest@starfury vulcan-registrator]$ make
     # pass in the etcd host/s which vulcand is using, the ip address of the docker host and the hostname
-    [jest@starfury vulcan-registrator]$ docker run -ti --rm -v /var/run/docker.sock:/var/run/docker.sock -e ETCD=10.241.1.71 -e HOST_NAME=10.241.1.71 -e IPADDRESS=10.241.1.71 gambol99/vulcan-registrator -v
+    [jest@starfury vulcan-registrator]$ docker run -ti --rm -v /var/run/docker.sock:/var/run/docker.sock -e ETCD=10.241.1.71 -e IPADDRESS=10.241.1.71 gambol99/vulcan-registrator -v
 
 Service Descriptor
 ------------------

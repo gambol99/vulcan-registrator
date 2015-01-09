@@ -8,7 +8,6 @@
 
 ETCD=${ETCD:-127.0.0.1}
 ETCD_PORT=${ETCD_PORT:-4001}
-HOST_NAME=${HOST_NAME:-""}
 IPADDRESS=${IPADDRESS:-""}
 SOCKET=${SOCKET:-/var/run/docker.sock}
 
@@ -17,8 +16,6 @@ failed() {
   exit 1
 }
 
-# step: check we have HOSTNAME
-[ -z "$HOSTNAME"  ] && failed "You need to supply a hostname of the docker host"
 # step: check we have an ip address
 [ -z "$IPADDRESS" ] && failed "You need to supply a ip address for the docker host"
 # step: check we have a docker socket

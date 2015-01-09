@@ -147,7 +147,6 @@ module Vulcand
     def default_options
       {
         :etcd       => ENV['ETCD'] || '127.0.0.1',
-        :hostname   => ENV['HOSTNAME'],
         :ipaddress  => ENV['IPADDRESS'],
         :port       => ENV['ETCD_PORT'] || 4001,
         :docker     => ENV['SOCKET'] || '/var/run/docker.sock',
@@ -257,7 +256,7 @@ module Vulcand
             :id      => service_name,
             :address => options[:ipaddress],
             :port    => exposed_ports[service_port],
-            :name    => "#{options[:hostname]}_#{hostname}",
+            :name    => "#{options[:ipaddress]}_#{hostname}",
           }
           found_services = true
 
