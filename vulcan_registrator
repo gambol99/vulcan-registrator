@@ -13,13 +13,11 @@ require 'json'
 
 module Vulcand
   module API
-    VULCAN   = "/vulcand"
-    BACKENDS = "#{VULCAN}/backends"
-
-    BACKEND_KEY = "/vulcand/backends/%s/backend"
-
+    VULCAN             = "/vulcand"
+    BACKENDS           = "#{VULCAN}/backends"
+    BACKEND_KEY        = "/vulcand/backends/%s/backend"
     BACKEND_SERVER_KEY = "/vulcand/backends/%s/servers/%s"
-    FRONENT_KEY = "/vulcand/frontends/%s/frontend"
+    FRONENT_KEY        = "/vulcand/frontends/%s/frontend"
 
     def backends
       # step: get a list of backends
@@ -71,6 +69,32 @@ module Vulcand
     end
   end
 
+  module ContainerUtils
+    # step: extract the ports from the container
+    def ports container
+      ports = {}
+      (container.info["NetworkSettings"]["Ports"] || {}).each_pair do |port,value|
+        ports[$1] = value.first["HostPort"] if port =~ /^([0-9]{1,5})\/tcp$/
+      end
+      ports
+    end
+
+    def ipaddress container
+      container.info['NetworkSettings']['IPAddress'] || nil
+    end
+
+    def hostname container
+      container.info['Config']['Hostname']
+    end
+
+    def environment container
+      (container.info['Config']['Env'] || {}).inject({}) do |h,item|
+        h[$1] = $2 if item =~ /(.*)=(.*)/
+        h
+      end
+    end
+  end
+
   module Utils
     def validate_socket filename
       raise ArgumentError, "the file: #{filename} does not exist" unless File.exist? filename
@@ -95,57 +119,28 @@ module Vulcand
     include Utils
     include API
 
+
     def initialize
       begin
         # step: parser the command line options
         parser.parse!
+
+        # step: check we have the requirements
+
+        # check: we docker socket and its readable
+        validate_socket options[:docker]
+        # check: we valid the etcd url
+        validate_ipaddress options[:etcd]
+        # check: check we have a valid ip address to register services
+        validate_ipaddress options[:ipaddress]
+
         # step: call the registration
         registration
+
       rescue SystemExit => e
         exit e.status
       rescue Exception => e
         parser.usage e.message
-      end
-    end
-
-    def registration
-      # step: we check we docker socket and its readable
-      validate_socket options[:docker]
-      # step: we valid the etcd url
-      validate_ipaddress options[:etcd]
-      # step: check we have a valid ip address to register services
-      validate_ipaddress options[:ipaddress]
-
-      # step: before we use the docker events, lets get a complete list of container and process them
-      verbose "checking for running containers and processing them"
-      containers.each do |id|
-        verbose "found container: #{container_name(id)}, proccessing it"
-        process_container_start(id)
-      end
-
-      verbose "entering into the docker events loop"
-
-      # step: we listen out for docker events - start and die
-      Docker::Event.stream do |event|
-        begin
-          id = event.id
-          status = event.status
-          verbose "event: #{status}, container id: #{container_name(id)}"
-
-          # step: we only care about start and die
-          case status
-            when "start"
-              verbose "container: #{container_name(id)} has started"
-              # step: we inspect the container and look for any registration request
-              process_container_start(id)
-            when "die"
-              verbose "container: #{container_name(id)} has died"
-              process_container_died(id)
-          end
-
-        rescue Exception => e
-          puts "failed to process event: [#{status},#{container_name(id)}], error: #{e.message}"
-        end
       end
     end
 
@@ -160,8 +155,51 @@ module Vulcand
       }
     end
 
+    def registration
+      # step: list the running containers and register service
+      say "checking for running containers and any services"
+      containers do |id|
+        register_services(id)
+      end
+
+      # step: we build a list of advertized services and remove anything
+      # we are NOT presently running - essentially we are cleaning up dead services
+
+
+      # step: we can now move into the docker events
+      say "entering into the docker events listener"
+      register_docker_events
+
+    end
+
     private
-    def process_container_start id
+    def register_docker_events
+      say "entering into docker events"
+      # step: we listen out for docker events - start and die
+      Docker::Event.stream do |event|
+        begin
+          id = event.id
+          status = event.status
+          verbose "event: #{status}, container id: #{container_name(id)}"
+
+          # step: we only care about start and die
+          case status
+            when "start"
+              verbose "container: #{container_name(id)} has started"
+              # step: we inspect the container and look for any registration request
+              register_services(id)
+            when "die"
+              verbose "container: #{container_name(id)} has died"
+              unregister_services(id)
+          end
+
+        rescue Exception => e
+          puts "failed to process event: [#{status},#{container_name(id)}], error: #{e.message}"
+        end
+      end
+    end
+
+    def register_services id
       say "processing startup container: #{container_name(id)}"
       vulcan_services id do |services|
         say "found services in container: #{container_name(id)}"
@@ -179,7 +217,7 @@ module Vulcand
       end
     end
 
-    def process_container_died id
+    def unregister_services id
       say "processing death of container: #{container_name(id)}"
       # step: we check if the container registered any services and remove them
       if registered[id]
@@ -195,27 +233,26 @@ module Vulcand
       end
     end
 
-    def vulcan_services container_id
-      verbose "searching for vulcan services in container: #{container_name(container_id)}"
+    # probe the container and looking for service registration headers
+    def vulcan_services id
+      verbose "searching for vulcan services in container: #{container_name(id)}"
 
       # step: we inspect the container and get the environment
-      container = ::Docker::Container.get(container_id)
-      info = container.info
-      config = info['Config']
-      hostname = config['Hostname']
-      environment = container_environment(config['Env'] || {})
-      exposed_ports = container_ports(info)
+      container     = ::Docker::Container.get(id)
+      hostname      = ContainerUtils::environment(container)
+      address       = ContainerUtils::ipaddress(container)
+      environment   = ContainerUtils::environment(container)
+      exposed_ports = ContainerUtils::container_ports(container)
 
       # step: validate we have an ipaddress for this container
-      service_address = info["NetworkSettings"]["IPAddress"] || nil
-      unless service_address
-        verbose "the container: #{container_name(container_id)} has not ip address, skipping"
+      unless address
+        say "container: #{container_name(id)} has not ip address, skipping"
         return
       end
 
       # step: if we have no exposed port we can ignore
       if exposed_ports.empty?
-        verbose "container: #{container_name(container_id)} has not exposed services"
+        verbose "container: #{container_name(id)} has not exposed services"
         return
       end
 
@@ -260,33 +297,13 @@ module Vulcand
       yield services if found_services and block_given?
     end
 
-    def container_ports config
-      ports = {}
-      # step: extract the ports from the container
-      container_ports = config["NetworkSettings"]["Ports"] || {}
-      container_ports.each_pair do |port,value|
-        if port =~ /^([0-9]{1,5})\/tcp$/
-          ports[$1] = value.first["HostPort"]
-        end
-      end
-      ports
-    end
-
     def container_name id
       id[0..13]
     end
 
-    def container_environment items
-      items.inject({}) do |h,item|
-        h[$1] = $2 if item =~ /(.*)=(.*)/
-        h
-      end
-    end
-
     def containers
-      ::Docker::Container.all.inject([]) do |list,container|
-        list << container.id
-        list
+      ::Docker::Container.all.each do |container|
+        yield x.id if block_given?
       end
     end
 
@@ -309,8 +326,6 @@ module Vulcand
     def registered
       @registered ||= {}
     end
-
-
 
     def options
       @options ||= default_options
