@@ -119,27 +119,32 @@ module Vulcand
       # step: before we use the docker events, lets get a complete list of container and process them
       verbose "checking for running containers and processing them"
       containers.each do |id|
-        verbose "found container: #{id[0..12]}, proccessing it"
+        verbose "found container: #{container_name(id)}, proccessing it"
         process_container_start(id)
       end
 
       verbose "entering into the docker events loop"
+
       # step: we listen out for docker events - start and die
-      docker_events do |id, status|
-        verbose "event: #{status}, container id: #{id[0..12]}"
+      Docker::Event.stream do |event|
         begin
+          id = event.id
+          status = event.status
+          verbose "event: #{status}, container id: #{container_name(id)}"
+
           # step: we only care about start and die
           case status
             when "start"
-              verbose "container: #{id[0..12]} has started"
+              verbose "container: #{container_name(id)} has started"
               # step: we inspect the container and look for any registration request
               process_container_start(id)
             when "die"
-              verbose "container: #{id[0..12]} has died"
+              verbose "container: #{container_name(id)} has died"
               process_container_died(id)
           end
+
         rescue Exception => e
-          puts "failed to process event: [#{status},#{id[0..12]}], error: #{e.message}"
+          puts "failed to process event: [#{status},#{container_name(id)}], error: #{e.message}"
         end
       end
     end
@@ -188,21 +193,6 @@ module Vulcand
           end
         end
       end
-    end
-
-    def etcd
-      @etcd ||= Etcd::Client.new(:host => options[:etcd], :port => options[:port] )
-    end
-
-    # VS_80_BACKEND_ID=api
-    # VS_8181_BACKEND_ID=frontend
-
-    # VS_FRONTEND_ID=
-    # VS_FRONTEND_ROUTE=
-    # VS_FRONTEND_HOSTNAME=
-
-    def registered
-      @registered ||= {}
     end
 
     def vulcan_services container_id
@@ -300,14 +290,6 @@ module Vulcand
       end
     end
 
-    def docker_events
-      verbose "starting to listen out for docker events"
-      Docker::Event.stream do |event|
-        yield event.id, event.status if block_given?
-      end
-      verbose "exitting the docker events loop"
-    end
-
     def verbose message
       puts "v: #{message}" if message and options[:verbose]
     end
@@ -315,6 +297,20 @@ module Vulcand
     def say message
       puts "*: #{message}"
     end
+
+    def etcd
+      @etcd ||= etc_connection
+    end
+
+    def etc_connection
+      Etcd::Client.new(:host => options[:etcd], :port => options[:port] )
+    end
+
+    def registered
+      @registered ||= {}
+    end
+
+
 
     def options
       @options ||= default_options
