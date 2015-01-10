@@ -20,10 +20,10 @@ module Vulcand
     API_KEY_FRONTENDS          = "#{API_KEY_VULCAN}/frontends"
     API_KEY_FRONENT_KEY        = "#{API_KEY_FRONTENDS}/%s/frontend"
 
-    attr_reader :etcd, :options
+    attr_reader :options
 
-    def initialize(options = {})
-      @options = options
+    def initialize(ops = {})
+      @options = opts
       verbose "initializing vulcand api connection, endpoint: #{options[:host]}:#{options[:port]}"
     end
 
@@ -64,7 +64,18 @@ module Vulcand
       delete(key)
     end
 
+    def add_frontend(service)
+      annonce "adding a frontend: #{service[:id]}, backend: #{service[:backend]}"
+      # step: we make sure the backend exists
+      add_backend(service[:backend]) unless backends.include? service[:backend]
+      # step: we validate and add the frontend
+    end
+
     private
+    def options
+      @options ||= {}
+    end
+
     def get(key)
       api do
         verbose "get() key: #{key}"

@@ -1,4 +1,4 @@
-#!/usr/bin/env ruby
+#!/usr/bin/ruby
 #
 #   Author: Rohith
 #   Date: 2014-10-10 20:53:36 +0100 (Fri, 10 Oct 2014)
@@ -12,7 +12,6 @@ require 'lib/utils'
 require 'lib/docker'
 require 'lib/vulcand'
 require 'thread'
-require 'pp'
 
 module Vulcand
   class Registration
@@ -41,7 +40,8 @@ module Vulcand
         o.on( '-s SOCKET', '--socker SOCKET', "the path to the docker socket (defaults to #{options[:docker]})" ) { |x| options[:docker] = x }
         o.on( '-P PREFIX', '--prefix PREFIX', "the prefix for vulcand services (defaults to #{options[:prefix]})" ) { |x|  options[:prefix] = x }
         o.on( '-i IPADDRESS', '--ipaddress IPADDRESS', "the ip address to register the services with" ) { |x| options[:ipaddress] = x }
-        o.on( '-A', '--permit-frontend', "by default we dont any changed to frontend, this override" ) { options[:allow_frontend] = true }
+        o.on( '--allow-frontend-create', "by default we dont any changed to frontend, this override" ) { options[:frontend_create] = true }
+        o.on( '--allow-frontend-change', "by default false, allows us to update the frontend config") { options[:frontend_change] = true }
         o.on( '--dry-run', 'perform a dry run, i.e. do not change anything' ) { |x| options[:dry_run] = true }
         o.on( '-v', '--verbose', 'switch on verbose logging mode' ) { options[:verbose] = true }
       end
@@ -49,14 +49,15 @@ module Vulcand
 
     def default_options
       {
-        :dry_run        => false,
-        :host           => ENV['ETCD'] || '127.0.0.1',
-        :ipaddress      => ENV['IPADDRESS'],
-        :port           => ENV['ETCD_PORT'] || 4001,
-        :socket         => ENV['SOCKET'] || '/var/run/docker.sock',
-        :verbose        => false,
-        :allow_frontend => false,
-        :prefix         => 'VS',
+        :dry_run         => false,
+        :host            => ENV['ETCD'] || '127.0.0.1',
+        :ipaddress       => ENV['IPADDRESS'],
+        :port            => ENV['ETCD_PORT'] || 4001,
+        :socket          => ENV['SOCKET'] || '/var/run/docker.sock',
+        :verbose         => false,
+        :frontend_create => false,
+        :frontend_change => false,
+        :prefix          => 'VS',
       }
     end
 
@@ -161,7 +162,7 @@ module Vulcand
             api.add_server(service)
           end
 
-          if options[:allow_frontend]
+          if options[:frontend_create]
             services[:frontend].each do |service|
               api.add_frontend(service)
             end

@@ -21,9 +21,5 @@ module Vulcand
         address
       end
     end
-
-    def options
-      @options ||= {}
-    end
   end
 end

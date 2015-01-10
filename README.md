@@ -25,14 +25,31 @@ Usage
     # pass in the etcd host/s which vulcand is using, the ip address of the docker host and the hostname
     [jest@starfury vulcan-registrator]$ docker run -ti --rm -v /var/run/docker.sock:/var/run/docker.sock -e ETCD=10.241.1.71 -e IPADDRESS=10.241.1.71 gambol99/vulcan-registrator -v
 
-Service Descriptor
+Backend Server Definitions
 ------------------
 
-Backend services are defined into the environment variables of the container, the prefix (defaults to VS_ at present) can be changed via the command line; Thus a container exposing two services on ports 80 and 8181 can defined as
+Registering a container with one or more backend service (i.e. endpoint) is Vulcan is performed by placing the descriptor in the environment variables (dockerfile and or runtime).
+
+Taking the following example; with have some container exposing ports 80, 8080 (these are the container ports NOT the dynamic host ports, as those will be translated for you when registered) and for the sake of it lets say these go in backend service 'api' and 'site'
 
     docker run ....
     -e VS_80_BACKEND_ID=app_service
     -e VS_8181_BACKEND_ID=emails_service
+
+Note: if the backend service is not defined in vulcand config, it's created for you before adding the service.
+
+Frontend Server Definitions
+------------------
+
+By default this is diabled (check command line options to enable). Descriptor for frontend services are read in the same manner backend services, via the environment variables. 'APP' is the frontend id
+
+    docker run ....
+    -e VS_FRONTEND_<NAME>_TYPE=http
+    -e VS_FRONTEND_APP_BACKEND_ID=app
+    -e VS_FRONTEND_APP_ROUTE=PathRegexp('/admin/.*')
+    -e VS_FRONTEND_APP_HOSTNAME=api.domain.com
+
+Notes: check the [routing language](http://www.vulcanproxy.com/proxy.html#routing-language) for vulcand for better under the ROUTE tag; the tag is validated and passed direct.
 
 Details
 -------
