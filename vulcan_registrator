@@ -5,138 +5,27 @@
 #
 #  vim:ts=2:sw=2:et
 #
-gem 'docker-api', :require => 'docker'
-require 'docker'
+$:.unshift File.join(File.dirname(__FILE__),'.','.')
 require 'optionscrapper'
-require 'etcd'
-require 'json'
+require 'lib/logging'
+require 'lib/utils'
+require 'lib/docker'
+require 'lib/vulcand'
+require 'thread'
 
 module Vulcand
-  module API
-    VULCAN             = "/vulcand"
-    BACKENDS           = "#{VULCAN}/backends"
-    BACKEND_KEY        = "/vulcand/backends/%s/backend"
-    BACKEND_SERVER_KEY = "/vulcand/backends/%s/servers/%s"
-    FRONENT_KEY        = "/vulcand/frontends/%s/frontend"
-
-    def backends
-      # step: get a list of backends
-      unless etcd.exists? BACKENDS
-        etcd.set BACKENDS, :dir => true
-      end
-      # step: get a list of backends
-      etcd.get( BACKENDS ).node.children.map { |x| File.basename(x.key) }
-    end
-
-    def create_backend name
-      key  = BACKEND_KEY % [ name ]
-      data = { "Type" => "http" }
-      etcd.set key, value: data.to_json
-    end
-
-    def insert_backend(service)
-      verbose "backends: #{backends}"
-
-      # step: check if the backend exists
-      unless backends.include? service[:id]
-        verbose "the backend: #{service[:id]} does not exist, creating it"
-        create_backend service[:id]
-      end
-
-      # step: add the server to the backend
-      key  = BACKEND_SERVER_KEY % [ service[:id], service[:name] ]
-      data = { "URL" => "http://#{service[:address]}:#{service[:port]}" }
-      verbose "[etcd] setting key: #{key}, data: #{data}"
-      etcd.set key, value: data.to_json
-    end
-
-    def remove_backend(service)
-      # step: check if the backend exists
-      unless backends.include? service[:id]
-        verbose "the backend: #{service[:id]} ignoring the request"
-        return
-      end
-      key = BACKEND_SERVER_KEY % [ service[:id], service[:name] ]
-      etcd.delete(key) if etcd.exists? key
-    end
-
-    def insert_frontend(service)
-
-    end
-
-    def remove_frontend(service)
-
-    end
-  end
-
-  module ContainerUtils
-    # step: extract the ports from the container
-    def ports container
-      ports = {}
-      (container.info["NetworkSettings"]["Ports"] || {}).each_pair do |port,value|
-        ports[$1] = value.first["HostPort"] if port =~ /^([0-9]{1,5})\/tcp$/
-      end
-      ports
-    end
-
-    def ipaddress container
-      container.info['NetworkSettings']['IPAddress'] || nil
-    end
-
-    def hostname container
-      container.info['Config']['Hostname']
-    end
-
-    def environment container
-      (container.info['Config']['Env'] || {}).inject({}) do |h,item|
-        h[$1] = $2 if item =~ /(.*)=(.*)/
-        h
-      end
-    end
-  end
-
-  module Utils
-    def validate_socket filename
-      raise ArgumentError, "the file: #{filename} does not exist" unless File.exist? filename
-      raise ArgumentError, "the file: #{filename} is not a socket" unless File.socket? filename
-      raise ArgumentError, "the socket: #{filename} is not readable" unless File.readable? filename
-      raise ArgumentError, "the socket: #{filename} is not writable" unless File.writable? filename
-      # step: set the docker socket
-      socket = "unix://#{filename}"
-      verbose "setting the docker socket: #{socket}"
-      ::Docker.url = socket
-      filename
-    end
-
-    def validate_ipaddress address
-      raise ArgumentError, "you have not specfied an ip address to register services" unless address
-      raise ArgumentError, "the ip address: #{address} is invalid" unless address =~ /^([0-9]{1,3}\.){3}[0-9]{1,3}$/
-      address
-    end
-  end
-
   class Registration
+    include Logging
     include Utils
-    include API
 
+    attr_reader :api
 
     def initialize
       begin
         # step: parser the command line options
         parser.parse!
-
-        # step: check we have the requirements
-
-        # check: we docker socket and its readable
-        validate_socket options[:docker]
-        # check: we valid the etcd url
-        validate_ipaddress options[:etcd]
-        # check: check we have a valid ip address to register services
-        validate_ipaddress options[:ipaddress]
-
         # step: call the registration
         registration
-
       rescue SystemExit => e
         exit e.status
       rescue Exception => e
@@ -144,115 +33,155 @@ module Vulcand
       end
     end
 
+    def parser
+      @parser ||= OptionScrapper.new do |o|
+        o.on( '-H HOST', '--host HOST', "the hostname / address of etcd host when is being used for vulcand config" ) { |x| options[:host] = x }
+        o.on( '-p PORT', '--port PORT', "the port which etcd is running on (defaults to #{options[:port]}) ") { |x| options[:port] = x.to_i }
+        o.on( '-s SOCKET', '--socker SOCKET', "the path to the docker socket (defaults to #{options[:docker]})" ) { |x| options[:docker] = x }
+        o.on( '-P PREFIX', '--prefix PREFIX', "the prefix for vulcand services (defaults to #{options[:prefix]})" ) { |x|  options[:prefix] = x }
+        o.on( '-i IPADDRESS', '--ipaddress IPADDRESS', "the ip address to register the services with" ) { |x| options[:ipaddress] = x }
+        o.on( '-A', '--permit-frontend', "by default we dont any changed to frontend, this override" ) { options[:allow_frontend] = true }
+        o.on( '--dry-run', 'perform a dry run, i.e. do not change anything' ) { |x| options[:dry_run] = true }
+        o.on( '-v', '--verbose', 'switch on verbose logging mode' ) { options[:verbose] = true }
+      end
+    end
+
     def default_options
       {
-        :etcd       => ENV['ETCD'] || '127.0.0.1',
-        :ipaddress  => ENV['IPADDRESS'],
-        :port       => ENV['ETCD_PORT'] || 4001,
-        :docker     => ENV['SOCKET'] || '/var/run/docker.sock',
-        :verbose    => false,
-        :prefix     => 'VS',
+        :dry_run        => false,
+        :host           => ENV['ETCD'] || '127.0.0.1',
+        :ipaddress      => ENV['IPADDRESS'],
+        :port           => ENV['ETCD_PORT'] || 4001,
+        :socket         => ENV['SOCKET'] || '/var/run/docker.sock',
+        :verbose        => false,
+        :allow_frontend => false,
+        :prefix         => 'VS',
       }
     end
 
     def registration
+      annonce "starting the vulcand registration service"
+      # step: validate the options
+      validate_options
       # step: list the running containers and register service
-      say "checking for running containers and any services"
-      containers do |id|
-        register_services(id)
-      end
-
+      register_running_containers
       # step: we build a list of advertized services and remove anything
       # we are NOT presently running - essentially we are cleaning up dead services
 
-
       # step: we can now move into the docker events
-      say "entering into the docker events listener"
       register_docker_events
-
     end
 
     private
+    def options
+      @options ||= default_options
+    end
+
+    def validate_options
+      # check: we docker socket and its readable
+      Utils::validate_socket options[:socket]
+      # check: we valid the etcd url
+      Utils::validate_ipaddress options[:host]
+      # check: check we have a valid ip address to register services
+      Utils::validate_ipaddress options[:ipaddress]
+      # step: set the docker socket
+      Docker::set_socket(options[:socket])
+    end
+
+    def api
+      @api ||= API::new(options)
+    end
+
+    def register_running_containers
+      annonce "checking for running containers and any services requiring registration"
+      Docker::containers do |containerId|
+        register_services(containerId)
+      end
+    end
+
     def register_docker_events
-      say "entering into docker events"
+      annonce "entering into docker events"
       # step: we listen out for docker events - start and die
-      Docker::Event.stream do |event|
-        begin
-          id = event.id
-          status = event.status
-          verbose "event: #{status}, container id: #{container_name(id)}"
-
-          # step: we only care about start and die
-          case status
-            when "start"
-              verbose "container: #{container_name(id)} has started"
-              # step: we inspect the container and look for any registration request
-              register_services(id)
-            when "die"
-              verbose "container: #{container_name(id)} has died"
-              unregister_services(id)
+      Docker::events do |id,status|
+        # step: process the event with in thread
+        Thread.new do
+          begin
+            verbose "event: #{status}, container id: #{cid(id)}"
+            # step: we only care about start and die
+            case status
+              when "start"
+                verbose "container: #{cid(id)} has started"
+                # step: we inspect the container and look for any registration request
+                register_services(id)
+              when "die"
+                verbose "container: #{cid(id)} has died"
+                unregister_services(id)
+            end
+          rescue Exception => e
+            error "failed to process event: [#{status},#{cid(id)}], error: #{e.message}"
           end
-
-        rescue Exception => e
-          puts "failed to process event: [#{status},#{container_name(id)}], error: #{e.message}"
         end
       end
     end
 
     def register_services id
-      say "processing startup container: #{container_name(id)}"
-      vulcan_services id do |services|
-        say "found services in container: #{container_name(id)}"
+      annonce "processing startup container: #{cid(id)}"
+      begin
+        vulcan_services id do |services|
+          annonce "found services in container: #{cid(id)}"
+          # step: we add the services to the registered list
+          registered[id] = services
 
-        # step: we add the services to the registered list
-        registered[id] = services
+          # step: we iterate the environment variable and search for registration requests
+          services[:backend].each do |service|
+            api.add_server(service)
+          end
 
-        # step: we iterate the environment variable and search for registration requests
-        [:backend,:frontend].each do |x|
-          services[x].each do |service|
-            say "adding the service #{x} => #{service}"
-            self.send "insert_#{x}", service
+          if options[:allow_frontend]
+            services[:frontend].each do |service|
+              api.add_frontend(service)
+            end
           end
         end
+      rescue Exception => e
+        puts e.backtrace
+        error "failed service registration for container: #{cid(id)}, error: #{e.message}"
       end
     end
 
     def unregister_services id
-      say "processing death of container: #{container_name(id)}"
+      annonce "processing death of container: #{cid(id)}"
       # step: we check if the container registered any services and remove them
       if registered[id]
-        say "container: #{container_name(id)} contained services, removing them"
+        annonce "container: #{cid(id)} contained services, removing them"
         services = registered[id]
         # step: we iterate the environment variable and search for registration requests
-        [:backend].each do |x|
-          services[x].each do |service|
-            say "removing the backend service #{x} => #{service}"
-            self.send "remove_#{x}", service
-          end
+        services[:backend].each do |service|
+          api.remove_server(service)
         end
       end
     end
 
     # probe the container and looking for service registration headers
     def vulcan_services id
-      verbose "searching for vulcan services in container: #{container_name(id)}"
+      verbose "searching for vulcan services in container: #{cid(id)}"
 
       # step: we inspect the container and get the environment
-      container     = ::Docker::Container.get(id)
-      hostname      = ContainerUtils::environment(container)
-      address       = ContainerUtils::ipaddress(container)
-      environment   = ContainerUtils::environment(container)
-      exposed_ports = ContainerUtils::container_ports(container)
+      container      = Docker::get(id)
+      container_name = Docker::hostname(container)
+      address        = Docker::ipaddress(container)
+      environment    = Docker::environment(container)
+      exposed_ports  = Docker::ports(container)
 
       # step: validate we have an ipaddress for this container
       unless address
-        say "container: #{container_name(id)} has not ip address, skipping"
+        annonce "container: #{cid(id)} has not ip address, skipping"
         return
       end
 
       # step: if we have no exposed port we can ignore
       if exposed_ports.empty?
-        verbose "container: #{container_name(id)} has not exposed services"
+        annonce "container: #{cid(id)} has zero exposed services"
         return
       end
 
@@ -267,13 +196,13 @@ module Vulcand
         # step: we look for vulcan backend
         if key =~ /^#{options[:prefix]}_([0-9]{1,5})_BACKEND_ID$/
           # service[port] => service{}
-          verbose "found backend service: #{value}:#{$1} in container: #{container_name(container_id)}"
+          annonce "found backend service: #{value}:#{$1} in container: #{cid(id)}"
           service_port = $1
           service_name = value
 
           # step: we have to check the port defined is being exposed by the container
           unless exposed_ports[service_port]
-            verbose "error in container config, the backend: #{service_name} states port #{service_port}, but port is not exposed"
+            error "error in container config, the backend: #{service_name} states port #{service_port}, but port is not exposed"
             # step: move along
             next
           end
@@ -283,12 +212,12 @@ module Vulcand
             :id      => service_name,
             :address => options[:ipaddress],
             :port    => exposed_ports[service_port],
-            :name    => "#{options[:ipaddress]}_#{hostname}",
+            :name    => "#{options[:ipaddress]}_#{container_name}",
           }
           found_services = true
 
         elsif key =~ /^#{options[:prefix]}_FRONTEND_(.*)$/
-          verbose "found backend service: #{value}:#{$1} in container: #{container_name(container_id)}}"
+          verbose "found backend service: #{value}:#{$1} in container: #{cid(id)}}"
           found_services = true
         end
       end
@@ -297,49 +226,12 @@ module Vulcand
       yield services if found_services and block_given?
     end
 
-    def container_name id
-      id[0..13]
-    end
-
-    def containers
-      ::Docker::Container.all.each do |container|
-        yield x.id if block_given?
-      end
-    end
-
-    def verbose message
-      puts "v: #{message}" if message and options[:verbose]
-    end
-
-    def say message
-      puts "*: #{message}"
-    end
-
-    def etcd
-      @etcd ||= etc_connection
-    end
-
-    def etc_connection
-      Etcd::Client.new(:host => options[:etcd], :port => options[:port] )
-    end
-
     def registered
       @registered ||= {}
     end
 
-    def options
-      @options ||= default_options
-      @options
-    end
-
-    def parser
-      @parser ||= OptionScrapper.new do |o|
-        o.on( '-H HOST', '--host HOST', "the hostname / address of etcd host when is being used for vulcand config" ) { |x| options[:etcd] = x }
-        o.on( '-p PORT', '--port PORT', "the port which etcd is running on (defaults to #{options[:port]}) ") { |x| options[:port] = x }
-        o.on( '-s SOCKET', '--socker SOCKET', "the path to the docker socket (defaults to #{options[:docker]})" ) { |x| options[:docker] = x }
-        o.on( '-i IPADDRESS', '--ipaddress IPADDRESS', "the ip address to register the services with" ) { |x| options[:ipaddress] = x }
-        o.on( '-v', '--verbose', 'switch on verbose logging mode' ) { options[:verbose] = true }
-      end
+    def cid containerId
+      Docker::cid(containerId)
     end
   end
 end

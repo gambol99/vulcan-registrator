@@ -7,7 +7,8 @@
 FROM centos
 MAINTAINER Rohith <gambol99@gmail.com>
 
-ADD vulcan_registrator /bin/vulcan_registrator
+ADD vulcan_registrator /opt/vulcan_registrator/bin
+ADD lib /opt/vulcan_registrator/lib
 ADD stage/startup.sh /startup.sh
 
 RUN chmod +x /startup.sh;
