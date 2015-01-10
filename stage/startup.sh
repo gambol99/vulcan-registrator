@@ -22,6 +22,4 @@ failed() {
 [ -S "$SOCKET" ] || failed "You have not specified or mapped in the docker socket: ${SOCKET}"
 
 echo "Starting the Vulcand Registrator service"
-echo "ruby /bin/vulcan_registrator -H ${ETCD} -i ${IPADDRESS} -p ${ETCD_PORT} -s ${SOCKET} $@"
-
-ruby /bin/vulcan_registrator -H ${ETCD} -i ${IPADDRESS} -p ${ETCD_PORT} -s ${SOCKET} $@
+ruby /opt/vulcan_registrator/bin -H ${ETCD} -i ${IPADDRESS} -p ${ETCD_PORT} -s ${SOCKET} $@
