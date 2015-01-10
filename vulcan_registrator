@@ -12,6 +12,7 @@ require 'lib/utils'
 require 'lib/docker'
 require 'lib/vulcand'
 require 'thread'
+require 'pp'
 
 module Vulcand
   class Registration
@@ -26,10 +27,10 @@ module Vulcand
         parser.parse!
         # step: call the registration
         registration
-      rescue SystemExit => e
-        exit e.status
       rescue Exception => e
         parser.usage e.message
+      rescue SystemExit => e
+        exit e.status
       end
     end
 
@@ -65,9 +66,10 @@ module Vulcand
       validate_options
       # step: list the running containers and register service
       register_running_containers
+      PP.pp registered
       # step: we build a list of advertized services and remove anything
       # we are NOT presently running - essentially we are cleaning up dead services
-
+      unregister_non_running_containers
       # step: we can now move into the docker events
       register_docker_events
     end
@@ -90,6 +92,29 @@ module Vulcand
 
     def api
       @api ||= API::new(options)
+    end
+
+    def unregister_non_running_containers
+      annonce "checking which services are currently advertized by us"
+      # step: we get a list of backends, iterate the servers and find anything related to us
+      api.backends.each do |x|
+        verbose "checking backend: #{x} for services from us"
+        api.backend_servers(x).each do |server|
+          # step: extract the key: <ip>_<container_hostname>
+          host_address, container_name = server.split("_")
+          if !host_address || !container_name
+            error "failed to extract host address or container name from service label: #{server}"
+            next
+          end
+          # step: is this us?
+          next unless host_address == options[:ipaddress]
+          # step: is the container running?
+          unless registered[container_name]
+            annonce "removing stale service, backend: #{x}, server: #{server} no longer running"
+            api.remove_server({:id => x, :name => server})
+          end
+        end
+      end
     end
 
     def register_running_containers
@@ -130,7 +155,7 @@ module Vulcand
         vulcan_services id do |services|
           annonce "found services in container: #{cid(id)}"
           # step: we add the services to the registered list
-          registered[id] = services
+          registered[cid(id)] = services
 
           # step: we iterate the environment variable and search for registration requests
           services[:backend].each do |service|
@@ -152,9 +177,9 @@ module Vulcand
     def unregister_services id
       annonce "processing death of container: #{cid(id)}"
       # step: we check if the container registered any services and remove them
-      if registered[id]
+      if registered[cid(id)]
         annonce "container: #{cid(id)} contained services, removing them"
-        services = registered[id]
+        services = registered[cid(id)]
         # step: we iterate the environment variable and search for registration requests
         services[:backend].each do |service|
           api.remove_server(service)
@@ -168,7 +193,6 @@ module Vulcand
 
       # step: we inspect the container and get the environment
       container      = Docker::get(id)
-      container_name = Docker::hostname(container)
       address        = Docker::ipaddress(container)
       environment    = Docker::environment(container)
       exposed_ports  = Docker::ports(container)
@@ -212,7 +236,7 @@ module Vulcand
             :id      => service_name,
             :address => options[:ipaddress],
             :port    => exposed_ports[service_port],
-            :name    => "#{options[:ipaddress]}_#{container_name}",
+            :name    => "#{options[:ipaddress]}_#{cid(id)}",
           }
           found_services = true
 

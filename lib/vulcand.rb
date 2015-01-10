@@ -40,7 +40,7 @@ module Vulcand
     end
 
     def backend_servers(backend)
-      raise ArgumentError, "the backend: #{backend} does not exists" unless api_backends.include? backend
+      raise ArgumentError, "the backend: #{backend} does not exists" unless backends.include? backend
       servers_key = API_KEY_BACKEND_SERVERS % [ backend ]
       get(servers_key).node.children.map { |x| File.basename(x.key) }
     end
@@ -56,11 +56,11 @@ module Vulcand
     end
 
     def remove_server(service)
-      annonce "removing service: #{service[:address]}:#{service[:port]} from backend: #{service[:id]}"
+      annonce "removing service: #{service[:name]} from backend: #{service[:id]}"
       # step: we make sure the backend exits
       return unless backends.include? service[:id]
       # step: remove the server
-            key = API_KEY_BACKEND_SERVER_KEY % [ service[:id], service[:name] ]
+      key = API_KEY_BACKEND_SERVER_KEY % [ service[:id], service[:name] ]
       delete(key)
     end
 
