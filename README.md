@@ -1,7 +1,7 @@
 Vulcan Registrator
 ------------------
 
-A proof of concept project using the Vulcand loadbalancer and a registation service to backend and frontend services via etcd keys
+A proof of concept project using the [Vulcand](https://github.com/mailgun/vulcan) loadbalancer and a registation service to backend and frontend services via etcd keys
 
   [jest@starfury vulcan-registrator]$ ./vulcan_registrator --help
 
