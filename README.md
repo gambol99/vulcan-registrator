@@ -10,11 +10,13 @@ A proof of concept project using the Vulcand loadbalancer and a registation serv
 
     -H, --host HOST                  the hostname / address of etcd host when is being used for vulcand config
     -p, --port PORT                  the port which etcd is running on (defaults to 4001)
-    -s, --socker SOCKET              the path to the docker socket (defaults to /var/run/docker.sock)
+    -s, --socker SOCKET              the path to the docker socket (defaults to )
+    -P, --prefix PREFIX              the prefix for vulcand services (defaults to VS)
     -i, --ipaddress IPADDRESS        the ip address to register the services with
+    -A, --permit-frontend            by default we dont any changed to frontend, this override
+        --dry-run                    perform a dry run, i.e. do not change anything
     -v, --verbose                    switch on verbose logging mode
     -h, --help                       display this usage menu
-
 
 Usage
 -----
