@@ -5,18 +5,20 @@ A proof of concept project using the [Vulcand](https://github.com/mailgun/vulcan
 
   [jest@starfury vulcan-registrator]$ ./vulcan_registrator --help
 
-    global : description: the global parser
-    ------------------------------------------------------------------------
+      global : description: the global parser
+      ------------------------------------------------------------------------
 
-    -H, --host HOST                  the hostname / address of etcd host when is being used for vulcand config
-    -p, --port PORT                  the port which etcd is running on (defaults to 4001)
-    -s, --socker SOCKET              the path to the docker socket (defaults to )
-    -P, --prefix PREFIX              the prefix for vulcand services (defaults to VS)
-    -i, --ipaddress IPADDRESS        the ip address to register the services with
-    -A, --permit-frontend            by default we dont any changed to frontend, this override
-        --dry-run                    perform a dry run, i.e. do not change anything
-    -v, --verbose                    switch on verbose logging mode
-    -h, --help                       display this usage menu
+      -H, --host HOST                  the hostname / address of etcd host when is being used for vulcand config
+      -p, --port PORT                  the port which etcd is running on (defaults to 4001)
+      -s, --socket SOCKET              the path to the docker socket (defaults to )
+      -P, --prefix PREFIX              the prefix for vulcand services (defaults to VS)
+      -i, --ipaddress IPADDRESS        the ip address to register the services with
+          --allow-frontend-create      by default we dont any changed to frontend, this override
+          --allow-frontend-change      by default false, allows us to update the frontend config
+          --dry-run                    perform a dry run, i.e. do not change anything
+      -v, --verbose                    switch on verbose logging mode
+      -h, --help                       display this usage menu
+
 
 Usage
 -----
