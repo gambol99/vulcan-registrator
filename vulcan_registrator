@@ -37,7 +37,7 @@ module Vulcand
       @parser ||= OptionScrapper.new do |o|
         o.on( '-H HOST', '--host HOST', 'the hostname / address of etcd host when is being used for vulcand config') { |x| options[:host] = x }
         o.on( '-p PORT', '--port PORT', "the port which etcd is running on (defaults to #{options[:port]}) ") { |x| options[:port] = x.to_i }
-        o.on( '-s SOCKET', '--socker SOCKET', "the path to the docker socket (defaults to #{options[:docker]})" ) { |x| options[:docker] = x }
+        o.on( '-s SOCKET', '--socket SOCKET', "the path to the docker socket (defaults to #{options[:docker]})" ) { |x| options[:docker] = x }
         o.on( '-P PREFIX', '--prefix PREFIX', "the prefix for vulcand services (defaults to #{options[:prefix]})" ) { |x|  options[:prefix] = x }
         o.on( '-i IPADDRESS', '--ipaddress IPADDRESS', 'the ip address to register the services with') { |x| options[:ipaddress] = x }
         o.on( '--allow-frontend-create', 'by default we dont any changed to frontend, this override') { options[:frontend_create] = true }
