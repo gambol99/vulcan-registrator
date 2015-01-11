@@ -12,7 +12,7 @@ module Vulcand
     include Logging
     include Utils
 
-    API_KEY_VULCAN             = "/vulcand"
+    API_KEY_VULCAN             = '/vulcand'
     API_KEY_BACKENDS           = "#{API_KEY_VULCAN}/backends"
     API_KEY_BACKEND_KEY        = "#{API_KEY_BACKENDS}/%s/backend"
     API_KEY_BACKEND_SERVERS    = "#{API_KEY_BACKENDS}/%s/servers"
@@ -20,10 +20,10 @@ module Vulcand
     API_KEY_FRONTENDS          = "#{API_KEY_VULCAN}/frontends"
     API_KEY_FRONENT_KEY        = "#{API_KEY_FRONTENDS}/%s/frontend"
 
-    attr_reader :etcd, :options
+    attr_reader :options
 
-    def initialize(options = {})
-      @options = options
+    def initialize(opts = {})
+      @options = opts
       verbose "initializing vulcand api connection, endpoint: #{options[:host]}:#{options[:port]}"
     end
 
@@ -36,7 +36,7 @@ module Vulcand
 
     def add_backend(name)
       annonce "adding the backend: #{name}"
-      set(API_KEY_BACKEND_KEY % [ name ], {"Type" => "http"}.to_json)
+      set(API_KEY_BACKEND_KEY % [ name ], {'Type' => 'http'}.to_json)
     end
 
     def backend_servers(backend)
@@ -51,7 +51,7 @@ module Vulcand
       add_backend(service[:id]) unless backends.include? service[:id]
       # step: we add the server to the backend
       service_key = API_KEY_BACKEND_SERVER_KEY % [ service[:id], service[:name] ]
-      service_data = { "URL" => "http://#{service[:address]}:#{service[:port]}" }.to_json
+      service_data = { 'URL' => "http://#{service[:address]}:#{service[:port]}" }.to_json
       set(service_key,service_data)
     end
 
@@ -64,7 +64,18 @@ module Vulcand
       delete(key)
     end
 
+    def add_frontend(service)
+      annonce "adding a frontend: #{service[:id]}, backend: #{service[:backend]}"
+      # step: we make sure the backend exists
+      add_backend(service[:backend]) unless backends.include? service[:backend]
+      # step: we validate and add the frontend
+    end
+
     private
+    def options
+      @options ||= {}
+    end
+
     def get(key)
       api do
         verbose "get() key: #{key}"

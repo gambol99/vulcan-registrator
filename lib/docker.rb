@@ -20,34 +20,34 @@ module Vulcand
         end
       end
 
-      def hostname container
+      def hostname(container)
         container.info['Config']['Hostname']
       end
 
-      def environment container
-        (container.info['Config']['Env'] || {}).inject({}) do |h,item|
+      def environment(container)
+        (container.info['Config']['Env'] || {}).inject({}) do |h, item|
           h[$1] = $2 if item =~ /(.*)=(.*)/
           h
         end
       end
 
-      def set_socket filename
+      def set_socket(filename)
         ::Docker.url = "unix://#{filename}"
       end
 
-      def ports container
+      def ports(container)
         ports = {}
-        (container.info['NetworkSettings']['Ports'] || {}).each_pair do |port,value|
+        (container.info['NetworkSettings']['Ports'] || {}).each_pair do |port, value|
           ports[$1] = value.first['HostPort'] if port =~ /^([0-9]{1,5})\/tcp$/
         end
         ports
       end
 
-      def ipaddress container
+      def ipaddress(container)
         container.info['NetworkSettings']['IPAddress'] || nil
       end
 
-      def cid container_id
+      def cid(container_id)
         container_id[0..13] if container_id
       end
 
