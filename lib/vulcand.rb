@@ -12,7 +12,7 @@ module Vulcand
     include Logging
     include Utils
 
-    API_KEY_VULCAN             = "/vulcand"
+    API_KEY_VULCAN             = '/vulcand'
     API_KEY_BACKENDS           = "#{API_KEY_VULCAN}/backends"
     API_KEY_BACKEND_KEY        = "#{API_KEY_BACKENDS}/%s/backend"
     API_KEY_BACKEND_SERVERS    = "#{API_KEY_BACKENDS}/%s/servers"
@@ -22,7 +22,7 @@ module Vulcand
 
     attr_reader :options
 
-    def initialize(ops = {})
+    def initialize(opts = {})
       @options = opts
       verbose "initializing vulcand api connection, endpoint: #{options[:host]}:#{options[:port]}"
     end
@@ -36,7 +36,7 @@ module Vulcand
 
     def add_backend(name)
       annonce "adding the backend: #{name}"
-      set(API_KEY_BACKEND_KEY % [ name ], {"Type" => "http"}.to_json)
+      set(API_KEY_BACKEND_KEY % [ name ], {'Type' => 'http'}.to_json)
     end
 
     def backend_servers(backend)
@@ -51,7 +51,7 @@ module Vulcand
       add_backend(service[:id]) unless backends.include? service[:id]
       # step: we add the server to the backend
       service_key = API_KEY_BACKEND_SERVER_KEY % [ service[:id], service[:name] ]
-      service_data = { "URL" => "http://#{service[:address]}:#{service[:port]}" }.to_json
+      service_data = { 'URL' => "http://#{service[:address]}:#{service[:port]}" }.to_json
       set(service_key,service_data)
     end
 

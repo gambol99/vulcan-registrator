@@ -16,7 +16,7 @@ module Vulcand
       end
 
       def validate_ipaddress(address)
-        raise ArgumentError, "you have not specfied an ip address to register services" unless address
+        raise ArgumentError, 'you have not specfied an ip address to register services' unless address
         raise ArgumentError, "the ip address: #{address} is invalid" unless address =~ /^([0-9]{1,3}\.){3}[0-9]{1,3}$/
         address
       end

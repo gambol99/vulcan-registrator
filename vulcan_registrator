@@ -35,14 +35,14 @@ module Vulcand
 
     def parser
       @parser ||= OptionScrapper.new do |o|
-        o.on( '-H HOST', '--host HOST', "the hostname / address of etcd host when is being used for vulcand config" ) { |x| options[:host] = x }
+        o.on( '-H HOST', '--host HOST', 'the hostname / address of etcd host when is being used for vulcand config') { |x| options[:host] = x }
         o.on( '-p PORT', '--port PORT', "the port which etcd is running on (defaults to #{options[:port]}) ") { |x| options[:port] = x.to_i }
         o.on( '-s SOCKET', '--socker SOCKET', "the path to the docker socket (defaults to #{options[:docker]})" ) { |x| options[:docker] = x }
         o.on( '-P PREFIX', '--prefix PREFIX', "the prefix for vulcand services (defaults to #{options[:prefix]})" ) { |x|  options[:prefix] = x }
-        o.on( '-i IPADDRESS', '--ipaddress IPADDRESS', "the ip address to register the services with" ) { |x| options[:ipaddress] = x }
-        o.on( '--allow-frontend-create', "by default we dont any changed to frontend, this override" ) { options[:frontend_create] = true }
-        o.on( '--allow-frontend-change', "by default false, allows us to update the frontend config") { options[:frontend_change] = true }
-        o.on( '--dry-run', 'perform a dry run, i.e. do not change anything' ) { |x| options[:dry_run] = true }
+        o.on( '-i IPADDRESS', '--ipaddress IPADDRESS', 'the ip address to register the services with') { |x| options[:ipaddress] = x }
+        o.on( '--allow-frontend-create', 'by default we dont any changed to frontend, this override') { options[:frontend_create] = true }
+        o.on( '--allow-frontend-change', 'by default false, allows us to update the frontend config') { options[:frontend_change] = true }
+        o.on( '--dry-run', 'perform a dry run, i.e. do not change anything' ) { options[:dry_run] = true }
         o.on( '-v', '--verbose', 'switch on verbose logging mode' ) { options[:verbose] = true }
       end
     end
@@ -62,7 +62,7 @@ module Vulcand
     end
 
     def registration
-      annonce "starting the vulcand registration service"
+      annonce 'starting the vulcand registration service'
       # step: validate the options
       validate_options
       # step: list the running containers and register service
@@ -95,13 +95,13 @@ module Vulcand
     end
 
     def unregister_non_running_containers
-      annonce "checking which services are currently advertized by us"
+      annonce 'checking which services are currently advertized by us'
       # step: we get a list of backends, iterate the servers and find anything related to us
       api.backends.each do |x|
         verbose "checking backend: #{x} for services from us"
         api.backend_servers(x).each do |server|
           # step: extract the key: <ip>_<container_hostname>
-          host_address, container_name = server.split("_")
+          host_address, container_name = server.split('_')
           if !host_address || !container_name
             error "failed to extract host address or container name from service label: #{server}"
             next
@@ -118,14 +118,14 @@ module Vulcand
     end
 
     def register_running_containers
-      annonce "checking for running containers and any services requiring registration"
+      annonce 'checking for running containers and any services requiring registration'
       Docker::containers do |containerId|
         register_services(containerId)
       end
     end
 
     def register_docker_events
-      annonce "entering into docker events"
+      annonce 'entering into docker events'
       # step: we listen out for docker events - start and die
       Docker::events do |id,status|
         # step: process the event with in thread
@@ -134,11 +134,11 @@ module Vulcand
             verbose "event: #{status}, container id: #{cid(id)}"
             # step: we only care about start and die
             case status
-              when "start"
+              when 'start'
                 verbose "container: #{cid(id)} has started"
                 # step: we inspect the container and look for any registration request
                 register_services(id)
-              when "die"
+              when 'die'
                 verbose "container: #{cid(id)} has died"
                 unregister_services(id)
             end
@@ -169,7 +169,6 @@ module Vulcand
           end
         end
       rescue Exception => e
-        puts e.backtrace
         error "failed service registration for container: #{cid(id)}, error: #{e.message}"
       end
     end
