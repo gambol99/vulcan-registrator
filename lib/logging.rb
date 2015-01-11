@@ -6,25 +6,25 @@
 #
 module Vulcand
   module Logging
-    def verbose message
-      print_message(message,"v") if options[:verbose]
+    def verbose(message)
+      print_message(message, "v") if options[:verbose]
     end
 
-    def annonce message
+    def annonce(message)
       print_message(message) if message
     end
 
-    def error message
-      print_message(message,"E")
+    def error(message)
+      print_message(message, "E")
     end
 
-    def failed message
-      print_message(message,"F")
+    def failed(message)
+      print_message(message, "F")
       exit 1
     end
 
     private
-    def print_message message, symbol = "*"
+    def print_message(message, symbol = "*")
       puts "[#{timestamp}][#{symbol}]: #{message.capitalize}" if message
     end
 

@@ -149,7 +149,7 @@ module Vulcand
       end
     end
 
-    def register_services id
+    def register_services(id)
       annonce "processing startup container: #{cid(id)}"
       begin
         vulcan_services id do |services|
@@ -174,7 +174,7 @@ module Vulcand
       end
     end
 
-    def unregister_services id
+    def unregister_services(id)
       annonce "processing death of container: #{cid(id)}"
       # step: we check if the container registered any services and remove them
       if registered[cid(id)]
@@ -188,14 +188,14 @@ module Vulcand
     end
 
     # probe the container and looking for service registration headers
-    def vulcan_services id
+    def vulcan_services(id)
       verbose "searching for vulcan services in container: #{cid(id)}"
 
       # step: we inspect the container and get the environment
-      container      = Docker::get(id)
-      address        = Docker::ipaddress(container)
-      environment    = Docker::environment(container)
-      exposed_ports  = Docker::ports(container)
+      container = Docker::get(id)
+      address = Docker::ipaddress(container)
+      environment = Docker::environment(container)
+      exposed_ports = Docker::ports(container)
 
       # step: validate we have an ipaddress for this container
       unless address
@@ -211,12 +211,12 @@ module Vulcand
 
       # step: we extract any potential services from
       services = {
-        :backend => [],
-        :frontend => []
+          :backend => [],
+          :frontend => []
       }
 
       found_services = false
-      environment.each_pair do |key,value|
+      environment.each_pair do |key, value|
         # step: we look for vulcan backend
         if key =~ /^#{options[:prefix]}_([0-9]{1,5})_BACKEND_ID$/
           # service[port] => service{}
@@ -233,10 +233,10 @@ module Vulcand
 
           # step: create a backend deinition from it
           services[:backend] << {
-            :id      => service_name,
-            :address => options[:ipaddress],
-            :port    => exposed_ports[service_port],
-            :name    => "#{options[:ipaddress]}_#{cid(id)}",
+              :id => service_name,
+              :address => options[:ipaddress],
+              :port => exposed_ports[service_port],
+              :name => "#{options[:ipaddress]}_#{cid(id)}",
           }
           found_services = true
 
@@ -254,8 +254,8 @@ module Vulcand
       @registered ||= {}
     end
 
-    def cid containerId
-      Docker::cid(containerId)
+    def cid(id)
+      Docker::cid(id)
     end
   end
 end
