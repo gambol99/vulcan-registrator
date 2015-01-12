@@ -10,3 +10,8 @@ VERSION=0.0.1
 
 build:
 	docker build -t ${AUTHOR}/${NAME} .
+
+vulcand:
+	docker build -t ${AUTHOR}/vulcand vulcand/
+
+.PHONY: build vulcand
