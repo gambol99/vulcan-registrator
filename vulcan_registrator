@@ -13,6 +13,10 @@ require 'lib/docker'
 require 'lib/vulcand'
 require 'thread'
 
+# hack to stop the time errors
+Excon.defaults[:write_timeout] = 86400
+Excon.defaults[:read_timeout]  = 86400
+
 module Vulcand
   class Registration
     include Logging
