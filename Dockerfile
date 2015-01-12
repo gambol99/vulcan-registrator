@@ -7,7 +7,7 @@
 FROM centos
 MAINTAINER Rohith <gambol99@gmail.com>
 
-ADD vulcan_registrator /opt/vulcan_registrator/bin
+ADD vulcan_registrator /opt/vulcan_registrator/bin/vulcan_registrator
 ADD lib /opt/vulcan_registrator/lib
 ADD stage/startup.sh /startup.sh
 
