@@ -38,6 +38,10 @@ module Vulcand
       def ports(container)
         ports = {}
         (container.info['NetworkSettings']['Ports'] || {}).each_pair do |port, value|
+          # check: the container can expose port, which are not mapped or used .. leaving us with
+          # {"443/tcp"=>nil, "80/tcp"=>[{"HostIp"=>"0.0.0.0", "HostPort"=>"31002"}]}
+          next unless value
+          # else extract the port
           ports[$1] = value.first['HostPort'] if port =~ /^([0-9]{1,5})\/tcp$/
         end
         ports
