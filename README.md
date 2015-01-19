@@ -58,3 +58,12 @@ Details
 On startup the registrator will retrieve a list of the currently running containers and search for services in their environment and will also compare whats currently running against what is presently advertized in the etcd config; thus if you die, config changes, containers change etc ... on startup anything which shouldn't be there is removed.
 
 Once at above it complete, the registrator then starts listening to docker events and waits for 'start', 'die' to maintain the services.
+
+Contributing
+------------
+ - Fork it
+ - Create your feature branch (git checkout -b my-new-feature)
+ - Commit your changes (git commit -am 'Add some feature')
+ - Push to the branch (git push origin my-new-feature)
+ - Create new Pull Request
+ - If applicable, update the README.md
