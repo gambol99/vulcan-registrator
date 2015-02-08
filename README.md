@@ -40,7 +40,7 @@ Taking the following example; with have some container exposing ports 80, 8080 (
 
 Note: if the backend service is not defined in vulcand config, it's created for you before adding the service.
 
-Frontend Server Definitions
+Frontend Server Definitions (not yet completed)
 ------------------
 
 By default this is diabled (check command line options to enable). Descriptor for frontend services are read in the same manner backend services, via the environment variables. 'APP' is the frontend id
